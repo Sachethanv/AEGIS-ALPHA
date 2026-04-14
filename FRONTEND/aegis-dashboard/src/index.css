@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+:root {
+  /* Backgrounds */
+  --bg-base:         #060d12;
+  --bg-panel:        rgba(8, 22, 32, 0.82);
+  --bg-panel-hover:  rgba(12, 32, 48, 0.92);
+  --bg-border:       rgba(0, 200, 130, 0.18);
+
+  /* Primary accent — tactical green */
+  --accent-green:    #00e87a;
+  --accent-green-dim: rgba(0, 232, 122, 0.25);
+
+  /* Secondary — cold blue */
+  --accent-blue:     #1ec8ff;
+  --accent-blue-dim: rgba(30, 200, 255, 0.2);
+
+  /* Warning & Critical */
+  --warn-yellow:     #f5c518;
+  --critical-red:    #ff3c3c;
+  --critical-red-dim: rgba(255, 60, 60, 0.2);
+
+  /* Text */
+  --text-primary:    #d4f5e9;
+  --text-secondary:  #6b9e8a;
+  --text-muted:      #3a5a50;
+
+  /* Pulse animation colors */
+  --pulse-ok:        #00e87a;
+  --pulse-warn:      #f5c518;
+  --pulse-critical:  #ff3c3c;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-base);
+  font-family: 'Rajdhani', sans-serif;
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+/* Dashboard Layout */
+.dashboard-root {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.dashboard-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Background overlays */
+.bg-overlay {
+  position: fixed;
+  inset: 0;
+  background-image: url('/assets/ar-soldier.jpg');
+  background-size: cover;
+  background-position: center top;
+  opacity: 0.15;
+  filter: grayscale(60%) contrast(1.2);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bg-scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 128, 0.015) 2px,
+    rgba(0, 255, 128, 0.015) 4px
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Utilities for tactical font */
+.font-tactical {
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* Animations */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes card-critical-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 60, 60, 0.2); }
+  50%       { box-shadow: 0 0 35px rgba(255, 60, 60, 0.45); }
+}
+
+@keyframes border-pulse {
+  0%, 100% { border-color: rgba(255, 60, 60, 0.5); }
+  50%       { border-color: rgba(255, 60, 60, 1); }
+}
+
+@keyframes pulse-dot-fast {
+  0%, 100% { opacity: 1; transform: scale(1.1); }
+  50%       { opacity: 0.3; transform: scale(0.7); }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.pulse-dot-fast {
+  animation: pulse-dot-fast 0.5s ease-in-out infinite;
+}
