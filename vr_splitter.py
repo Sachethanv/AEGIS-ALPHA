@@ -8,7 +8,7 @@ import json
 import re
 
 # Use Gemini 1.5 Flash for the fastest battlefield inference
-client = genai.Client(api_key="AIzaSyCtbBOwCNl9bC3Zn39xte2dGr2vcc00zSM")
+client = genai.Client(api_key="AIzaSyB3OC0c0LMvfMZmAhnk83b9bClYRXT1P1o")
 
 app = Flask(__name__)
 camera_url = "http://192.168.1.6:8080/video"
@@ -16,7 +16,7 @@ camera_url = "http://192.168.1.6:8080/video"
 import time
 
 # Global variables to store the latest AI data
-current_data = {"box": [0, 0, 0, 0], "injury": "Scanning...", "guidance": "Waiting for analysis"}
+current_data = {"box": [0, 0, 0, 0], "injury": "Scanning...", "guidance": "Waiting for analysis", "tourniquet": False}
 lock = threading.Lock()
 last_api_call = 0  # timestamp for API throttling
 
@@ -31,7 +31,8 @@ def call_gemini(frame):
             "Analyze the image and identify the most critical medical wound. "
             "If a wound is found, provide its bounding box as [ymin, xmin, ymax, xmax] normalized from 0 to 1000. "
             "Provide the injury type and a short guidance action. "
-            "If no wound is found, return box_2d as [0,0,0,0], injury as 'CLEAR', and guidance as 'Proceed'."
+            "Also check if a tourniquet has been applied to stop bleeding. Set 'tourniquet_applied' to true if you see one. "
+            "If no wound is found, return box_2d as [0,0,0,0], injury as 'CLEAR', guidance as 'Proceed', and tourniquet_applied as false."
         )
         
         response = client.models.generate_content(
@@ -45,9 +46,10 @@ def call_gemini(frame):
                     "properties": {
                         "box_2d": {"type": "ARRAY", "items": {"type": "INTEGER"}},
                         "injury": {"type": "STRING"},
-                        "guidance": {"type": "STRING"}
+                        "guidance": {"type": "STRING"},
+                        "tourniquet_applied": {"type": "BOOLEAN"}
                     },
-                    "required": ["box_2d", "injury", "guidance"]
+                    "required": ["box_2d", "injury", "guidance", "tourniquet_applied"]
                 }
             )
         )
@@ -62,6 +64,7 @@ def call_gemini(frame):
             current_data["box"] = data.get("box_2d", [0, 0, 0, 0])
             current_data["injury"] = data.get("injury", "Unknown")
             current_data["guidance"] = data.get("guidance", "N/A")
+            current_data["tourniquet"] = data.get("tourniquet_applied", False)
             print(f"Gemini Update: {current_data}")
     except Exception as e:
         print(f"Gemini Error: {e}")
@@ -84,24 +87,58 @@ def gen_frames():
         # 1. Standardize Frame for Single View
         view = cv2.resize(frame, (2532, 1170))
 
+        # Blackout Triage: Convert to Grayscale & Apply Jet Colormap
+        gray = cv2.cvtColor(view, cv2.COLOR_BGR2GRAY)
+        # Apply slight contrast enhancement to amplify heat signatures
+        gray = cv2.equalizeHist(gray)
+        view = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
+
         # 2. Draw Dynamic HUD
         with lock:
             ymin, xmin, ymax, xmax = current_data["box"]
             injury = current_data["injury"]
             guidance = current_data["guidance"]
+            tourniquet_applied = current_data.get("tourniquet", False)
+
+        # Logical Colors
+        if tourniquet_applied:
+            info_color = (0, 255, 0) # Green for Hemorrhage Controlled
+            injury_text = "HEMORRHAGE CONTROLLED"
+            action_text = "Hemorrhage Controlled"
+        else:
+            info_color = (0, 0, 255) # Red for default wound
+            injury_text = injury.upper()
+            action_text = guidance
 
         # Convert normalized [0-1000] to pixels [2532x1170]
-        start_point = (int(xmin * 2532 / 1000), int(ymin * 1170 / 1000))
-        end_point = (int(xmax * 2532 / 1000), int(ymax * 1170 / 1000))
+        c_xmin, c_ymin = int(xmin * 2532 / 1000), int(ymin * 1170 / 1000)
+        c_xmax, c_ymax = int(xmax * 2532 / 1000), int(ymax * 1170 / 1000)
 
         if any(current_data["box"]): # Only draw if a box exists
-            cv2.rectangle(view, start_point, end_point, (0, 0, 255), 4)
+            # AR Guidance: Pulsing center circle
+            center_x = (c_xmin + c_xmax) // 2
+            center_y = (c_ymin + c_ymax) // 2
             
+            # Pulsing effect based on time
+            pulse_radius = int(40 + 20 * np.sin(time.time() * 5))
+            cv2.circle(view, (center_x, center_y), pulse_radius, info_color, 4)
+            cv2.circle(view, (center_x, center_y), 5, info_color, -1)
+
+            # Draw directional arrow if wound is at screen extremes
+            if xmin < 100:
+                # Point Left
+                cv2.arrowedLine(view, (400, 585), (100, 585), (0, 255, 255), 10, tipLength=0.3)
+                cv2.putText(view, "TURN LEFT", (150, 540), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 4)
+            elif xmax > 900:
+                # Point Right
+                cv2.arrowedLine(view, (2132, 585), (2432, 585), (0, 255, 255), 10, tipLength=0.3)
+                cv2.putText(view, "TURN RIGHT", (2100, 540), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 4)
+
             # Label background for readability
             cv2.rectangle(view, (50, 50), (1216, 220), (0, 0, 0), -1)
-            cv2.putText(view, f"STATUS: {injury.upper()}", (70, 110), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
-            cv2.putText(view, f"ACTION: {guidance}", (70, 180), 
+            cv2.putText(view, f"STATUS: {injury_text}", (70, 110), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.5, info_color, 3)
+            cv2.putText(view, f"ACTION: {action_text}", (70, 180), 
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
 
         # 3. Final View

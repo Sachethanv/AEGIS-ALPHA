@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { Soldier } from '../../data/soldiers';
+import { SmsToast } from './SmsToast';
 
 interface Props {
   woundedSoldiers: Soldier[];
@@ -21,6 +23,8 @@ function findNearest(wounded: Soldier, others: Soldier[]): Soldier | null {
 }
 
 export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap }: Props) {
+  const [smsTarget, setSmsTarget] = useState<Soldier | null>(null);
+
   if (!woundedSoldiers.length) return null;
 
   return (
@@ -54,16 +58,25 @@ export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap }: Props) 
               </span>
             )}
 
+            {/* Trigger SMS */}
+            <button
+              onClick={() => setSmsTarget(wounded)}
+              className="bg-transparent border border-[#0b84ff] text-[#0b84ff] font-rajdhani font-bold text-[0.65rem] tracking-widest px-3 py-1 rounded cursor-pointer ml-auto hover:bg-[rgba(11,132,255,0.1)] transition-all"
+            >
+              SEND SMS
+            </button>
+
             {/* View on map */}
             <button
               onClick={() => onShowMap(wounded)}
-              className="bg-[var(--critical-red)] border-none text-white font-rajdhani font-bold text-[0.65rem] tracking-widest px-3 py-1 rounded cursor-pointer ml-auto hover:grayscale-[0.2] transition-all"
+              className="bg-[var(--critical-red)] border-none text-white font-rajdhani font-bold text-[0.65rem] tracking-widest px-3 py-1 rounded cursor-pointer hover:grayscale-[0.2] transition-all"
             >
               LOCATE ◎
             </button>
           </div>
         );
       })}
+      {smsTarget && <SmsToast soldier={smsTarget} onClose={() => setSmsTarget(null)} />}
     </div>
   );
 }
