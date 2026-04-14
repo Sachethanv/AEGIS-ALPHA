@@ -77,7 +77,7 @@ def gen_frames():
         current_time = time.time()
         # Throttling to once every 4 seconds to strictly obey the 
         # 5 RPM Free Tier limit of Gemini API
-        if current_time - last_api_call > 4:
+        if current_time - last_api_call > 5:
             last_api_call = current_time
             threading.Thread(target=call_gemini, args=(frame.copy(),), daemon=True).start()
 

@@ -13,22 +13,39 @@ export interface Soldier {
   isRealDevice: boolean;    // true for your actual ESP32 unit
   lastUpdated: string;
   spo2: number;             // blood oxygen %
+  aiDiagnosis?: {
+    condition: string;
+    confidence: number;
+    action: string;
+    isTrauma: boolean;
+  };
 }
 
-// BPM Thresholds
+// Medical Vitals Thresholds
 export const BPM_THRESHOLDS = {
-  LOW_CRITICAL: 40,   // below this = unconscious/critical
-  NOMINAL_MIN: 55,
-  NOMINAL_MAX: 100,
-  ELEVATED_MAX: 130,
-  CRITICAL_HIGH: 150,  // above this = wounded/shock
+  LOW_CRITICAL: 50,   // Below 50 indicates severe bradycardia / shock
+  NOMINAL_MIN: 60,    // 60-100 is normal resting heart rate
+  NOMINAL_MAX: 100,   // Above 100 is tachycardia (normal during combat/exertion)
+  ELEVATED_MAX: 140,  // 100-140 indicates high exertion or combat stress
+  CRITICAL_HIGH: 170, // Above 170 indicates extreme physical trauma or panic
 };
 
-export function getBpmStatus(bpm: number): SoldierStatus {
-  if (bpm < BPM_THRESHOLDS.LOW_CRITICAL) return 'WOUNDED';
-  if (bpm > BPM_THRESHOLDS.CRITICAL_HIGH) return 'WOUNDED';
-  if (bpm > BPM_THRESHOLDS.ELEVATED_MAX) return 'CRITICAL';
+export const SPO2_THRESHOLDS = {
+  CRITICAL_LOW: 90,   // Below 90% is severe hypoxia (requires immediate medical evac)
+  ELEVATED_LOW: 95,   // 90-94% is mild hypoxia
+};
+
+export function getVitalsStatus(bpm: number, spo2: number): SoldierStatus {
+  // Extreme cases -> WOUNDED
+  if (bpm <= BPM_THRESHOLDS.LOW_CRITICAL || spo2 <= SPO2_THRESHOLDS.CRITICAL_LOW) return 'WOUNDED';
+  if (bpm >= BPM_THRESHOLDS.CRITICAL_HIGH) return 'WOUNDED';
+  
+  // Severe cases -> CRITICAL
+  if (bpm > BPM_THRESHOLDS.ELEVATED_MAX || spo2 < SPO2_THRESHOLDS.ELEVATED_LOW) return 'CRITICAL';
+  
+  // High exertion cases -> ELEVATED
   if (bpm > BPM_THRESHOLDS.NOMINAL_MAX) return 'ELEVATED';
+  
   return 'NOMINAL';
 }
 
