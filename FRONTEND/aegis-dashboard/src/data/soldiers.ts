@@ -90,29 +90,5 @@ export const INITIAL_SOLDIERS: Soldier[] = [
     bpm: 72, bpmHistory: [70, 71, 72, 73, 72, 71, 72, 73, 72, 71, 72, 73, 74, 72, 71, 70, 72, 73, 72, 72],
     lat: 12.6901, lng: 77.4196, status: 'NOMINAL', isRealDevice: false, lastUpdated: '4s ago', spo2: 99,
   },
-  {
-    id: 'CHARLIE-01', name: 'Pradeep N.', rank: 'SGT', unit: 'Charlie Squad',
-    bpm: 68, bpmHistory: [65, 66, 67, 68, 69, 68, 67, 68, 69, 68, 67, 68, 69, 68, 67, 66, 68, 69, 68, 68],
-    lat: 12.6701, lng: 77.5196, status: 'NOMINAL', isRealDevice: false, lastUpdated: '2s ago', spo2: 98,
-  },
-  {
-    id: 'CHARLIE-02', name: 'Manoj P.', rank: 'CPL', unit: 'Charlie Squad',
-    bpm: 125, bpmHistory: [100, 105, 110, 115, 118, 120, 122, 124, 125, 126, 125, 124, 125, 126, 125, 124, 123, 125, 126, 125],
-    lat: 12.7301, lng: 77.4696, status: 'CRITICAL', isRealDevice: false, lastUpdated: '1s ago', spo2: 93,
-  },
-  {
-    id: 'CHARLIE-03', name: 'Suresh B.', rank: 'PFC', unit: 'Charlie Squad',
-    bpm: 80, bpmHistory: [78, 79, 80, 81, 80, 79, 80, 81, 82, 80, 79, 80, 81, 80, 79, 78, 80, 81, 80, 80],
-    lat: 12.6301, lng: 77.4696, status: 'NOMINAL', isRealDevice: false, lastUpdated: '3s ago', spo2: 97,
-  },
-  {
-    id: 'DELTA-01', name: 'Vikram H.', rank: 'SGT', unit: 'Delta Squad',
-    bpm: 88, bpmHistory: [85, 86, 87, 88, 89, 88, 87, 88, 89, 90, 88, 87, 88, 89, 88, 87, 86, 88, 89, 88],
-    lat: 12.7101, lng: 77.4996, status: 'NOMINAL', isRealDevice: false, lastUpdated: '2s ago', spo2: 96,
-  },
-  {
-    id: 'DELTA-02', name: 'Anand L.', rank: 'CPL', unit: 'Delta Squad',
-    bpm: 35, bpmHistory: [75, 60, 50, 42, 38, 36, 35, 34, 35, 36, 35, 34, 35, 36, 35, 34, 35, 36, 35, 35],
-    lat: 12.6501, lng: 77.4396, status: 'WOUNDED', isRealDevice: false, lastUpdated: 'NOW', spo2: 88,
-  },
 ];
+

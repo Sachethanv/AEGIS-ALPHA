@@ -16,7 +16,7 @@ export async function interpretVitals(bpm: number, spo2: number, bpmHistory: num
     throw new Error("Missing VITE_GEMINI_API_KEY environment variable. AI Triage unavailable.");
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   const prompt = `
     You are 'Sentinel AI', a high-stakes, real-time medical triage assistant for military casualties on an active battlefield.
     You evaluate biometric anomalies from wearable sensors and classify trauma.

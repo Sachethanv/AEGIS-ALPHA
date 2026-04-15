@@ -6,6 +6,7 @@ interface Props {
   woundedSoldiers: Soldier[];
   allSoldiers: Soldier[];
   onShowMap: (s: Soldier) => void;
+  onSendSms: (s: Soldier) => void;
 }
 
 // Find geographically nearest soldier to a wounded one
@@ -22,9 +23,7 @@ function findNearest(wounded: Soldier, others: Soldier[]): Soldier | null {
   });
 }
 
-export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap }: Props) {
-  const [smsTarget, setSmsTarget] = useState<Soldier | null>(null);
-
+export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap, onSendSms }: Props) {
   if (!woundedSoldiers.length) return null;
 
   return (
@@ -60,7 +59,7 @@ export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap }: Props) 
 
             {/* Trigger SMS */}
             <button
-              onClick={() => setSmsTarget(wounded)}
+              onClick={() => onSendSms(wounded)}
               className="bg-transparent border border-[#0b84ff] text-[#0b84ff] font-rajdhani font-bold text-[0.65rem] tracking-widest px-3 py-1 rounded cursor-pointer ml-auto hover:bg-[rgba(11,132,255,0.1)] transition-all"
             >
               SEND SMS
@@ -76,7 +75,7 @@ export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap }: Props) 
           </div>
         );
       })}
-      {smsTarget && <SmsToast soldier={smsTarget} onClose={() => setSmsTarget(null)} />}
+      {/* Toast state managed in App.tsx now to avoid container clipping */}
     </div>
   );
 }

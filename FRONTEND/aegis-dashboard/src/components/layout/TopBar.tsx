@@ -1,22 +1,8 @@
 import { useEffect, useState } from 'react';
 
 export function TopBar() {
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setElapsed(e => e + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const fmt = (s: number) => {
-    const h = String(Math.floor(s / 3600)).padStart(2, '0');
-    const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
-    const sec = String(s % 60).padStart(2, '0');
-    return `${h}:${m}:${sec}`;
-  };
-
   return (
-    <header className="flex items-center justify-between px-6 py-2 bg-[rgba(4,14,20,0.9)] border-b border-[var(--bg-border)] backdrop-blur-md relative z-10">
+    <header className="fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-6 bg-[rgba(4,14,20,0.92)] border-b border-[var(--bg-border)] backdrop-blur-md z-[1000]">
       {/* Logo */}
       <div className="flex items-center gap-3">
         <span className="text-2xl font-rajdhani font-bold text-[var(--accent-green)] tracking-widest">
@@ -25,12 +11,6 @@ export function TopBar() {
         <span className="hidden md:inline text-[0.7rem] text-[var(--text-muted)] font-mono tracking-widest">
           AI-ENHANCED GUARDIAN INTERFACE SYSTEM
         </span>
-      </div>
-
-      {/* Mission Clock */}
-      <div className="text-center">
-        <div className="text-[0.6rem] text-[var(--text-secondary)] tracking-widest font-rajdhani">MISSION ELAPSED</div>
-        <div className="text-2xl font-mono text-[var(--accent-green)]">{fmt(elapsed)}</div>
       </div>
 
       {/* Status Indicators */}
