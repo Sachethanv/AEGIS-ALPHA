@@ -52,19 +52,59 @@ body {
   z-index: 2;
 }
 
-/* Background overlays */
+/* ── Military hex-grid background ── */
 .bg-overlay {
   position: fixed;
   inset: 0;
-  background-image: url('/assets/ar-soldier.jpg');
-  background-size: cover;
-  background-position: center top;
-  opacity: 0.15;
-  filter: grayscale(60%) contrast(1.2);
   z-index: 0;
   pointer-events: none;
+
+  /* Deep dark base */
+  background-color: #060d12;
+
+  /* 
+    Layer 1: subtle hex tiling via radial dots arranged in a hex pattern 
+    Layer 2: faint diagonal grid lines (tactical map look)
+    Layer 3: vignette around the edges
+  */
+  background-image:
+    /* Corner vignette */
+    radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(0,0,0,0.7) 100%),
+    /* Hex dot pattern — offset two rows to simulate honeycomb */
+    radial-gradient(circle, rgba(0, 232, 122, 0.07) 1px, transparent 1px),
+    radial-gradient(circle, rgba(0, 232, 122, 0.04) 1px, transparent 1px),
+    /* Subtle diagonal cross-hatch */
+    repeating-linear-gradient(
+      60deg,
+      transparent,
+      transparent 28px,
+      rgba(0, 200, 130, 0.025) 28px,
+      rgba(0, 200, 130, 0.025) 29px
+    ),
+    repeating-linear-gradient(
+      -60deg,
+      transparent,
+      transparent 28px,
+      rgba(0, 200, 130, 0.025) 28px,
+      rgba(0, 200, 130, 0.025) 29px
+    );
+
+  background-size:
+    100% 100%,       /* vignette */
+    34px 60px,       /* hex dots row 1 */
+    34px 60px,       /* hex dots row 2 offset */
+    100% 100%,       /* diagonal A */
+    100% 100%;       /* diagonal B */
+
+  background-position:
+    0 0,
+    0 0,
+    17px 30px,       /* offset second row for honeycomb */
+    0 0,
+    0 0;
 }
 
+/* Scanline overlay */
 .bg-scanlines {
   position: fixed;
   inset: 0;
@@ -72,14 +112,14 @@ body {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 255, 128, 0.015) 2px,
-    rgba(0, 255, 128, 0.015) 4px
+    rgba(0, 255, 128, 0.012) 2px,
+    rgba(0, 255, 128, 0.012) 4px
   );
   z-index: 1;
   pointer-events: none;
 }
 
-/* Utilities for tactical font */
+/* Tactical font utilities */
 .font-tactical {
   font-family: 'Share Tech Mono', monospace;
 }

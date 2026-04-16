@@ -1,7 +1,7 @@
 import type { Soldier } from '../../data/soldiers';
 import {PulseChart} from './PulseChart';
 import { useState } from 'react';
-import { interpretVitals, type TriageResult } from '../../utils/aiTriage';
+import { evaluateTriage, type TriageResult } from '../../utils/triageRules';
 
 interface Props {
   soldier: Soldier;
@@ -16,22 +16,22 @@ const STATUS_COLORS = {
 };
 
 export function SoldierCard({ soldier, onShowMap }: Props) {
-  const color = STATUS_COLORS[soldier.status];
-  const isWounded = soldier.status === 'WOUNDED';
-  const isCritical = soldier.status === 'CRITICAL';
-
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [diagnosis, setDiagnosis] = useState<TriageResult | null>(null);
 
-  const handleAITriage = async () => {
+  const triage = diagnosis || evaluateTriage(soldier.bpm, soldier.spo2);
+  const color = triage.hudColor || STATUS_COLORS[soldier.status];
+  const isWounded = soldier.status === 'WOUNDED';
+  const isExtreme = triage.category === 'Extreme';
+
+  const handleRuleTriage = () => {
     setIsAnalyzing(true);
-    try {
-      const res = await interpretVitals(soldier.bpm, soldier.spo2, soldier.bpmHistory);
+    // Simulate a tiny delay for effect
+    setTimeout(() => {
+      const res = evaluateTriage(soldier.bpm, soldier.spo2);
       setDiagnosis(res);
-    } catch (e) {
-      console.error(e);
-    }
-    setIsAnalyzing(false);
+      setIsAnalyzing(false);
+    }, 400);
   };
 
   return (
@@ -40,7 +40,7 @@ export function SoldierCard({ soldier, onShowMap }: Props) {
         ${isWounded ? 'border-[var(--critical-red)] shadow-[0_0_20px_var(--critical-red-dim)]' : 'border-[var(--bg-border)]'}`}
       style={{
         borderLeft: `3px solid ${color}`,
-        animation: isWounded ? 'card-critical-pulse 1.2s ease-in-out infinite' : 'none',
+        animation: isExtreme ? 'card-critical-pulse 0.6s ease-in-out infinite' : (isWounded ? 'card-critical-pulse 1.2s ease-in-out infinite' : 'none'),
       }}
     >
       {/* WOUNDED alert badge */}
@@ -63,7 +63,7 @@ export function SoldierCard({ soldier, onShowMap }: Props) {
         {/* Status dot */}
         <span 
           className={`w-2 h-2 rounded-full shadow-[0_0_8px] inline-block
-            ${isWounded || isCritical ? 'pulse-dot-fast' : 'pulse-dot'}`} 
+            ${isWounded || isExtreme ? 'pulse-dot-fast' : 'pulse-dot'}`} 
           style={{ background: color, boxShadow: `0 0 8px ${color}` }}
         />
       </div>
@@ -111,11 +111,14 @@ export function SoldierCard({ soldier, onShowMap }: Props) {
         {diagnosis ? (
           <div className="bg-[rgba(0,0,0,0.2)] p-2 rounded border border-[var(--bg-border)]">
             <div className="flex justify-between items-center mb-1">
-              <span className="text-[0.6rem] font-rajdhani tracking-widest text-[var(--accent-blue)]">🤖 GEMINI TACTICAL AI</span>
-              <span className="text-[0.6rem] text-[var(--text-muted)]">{diagnosis.confidence}% CONF</span>
+              <span className="text-[0.6rem] font-rajdhani tracking-widest text-[var(--accent-blue)]">⬡ AEGIS RULE ENGINE</span>
+              <span className="text-[0.6rem] text-[var(--text-muted)]">DETRMINISTIC</span>
+            </div>
+            <div className={`font-mono text-[0.65rem] leading-tight mb-1 ${diagnosis.isTrauma ? 'text-[var(--critical-red)]' : 'text-[var(--accent-green)]'}`}>
+              STATUS: <span className="font-bold">{diagnosis.statusName}</span>
             </div>
             <div className={`font-mono text-sm leading-tight mb-1 ${diagnosis.isTrauma ? 'text-[var(--critical-red)]' : 'text-[var(--accent-green)]'}`}>
-              {diagnosis.condition}
+              DIAGNOSIS: <span className="font-bold uppercase tracking-tighter">{diagnosis.condition}</span>
             </div>
             <div className="text-[0.65rem] font-rajdhani text-[var(--text-secondary)]">
               ACTION: <span className="text-[var(--text-primary)]">{diagnosis.action}</span>
@@ -123,11 +126,11 @@ export function SoldierCard({ soldier, onShowMap }: Props) {
           </div>
         ) : (
           <button
-            onClick={handleAITriage}
+            onClick={handleRuleTriage}
             disabled={isAnalyzing}
             className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--bg-border)] rounded text-[0.65rem] font-rajdhani font-semibold tracking-[0.15em] py-1.5 cursor-pointer transition-all hover:bg-[rgba(255,255,255,0.1)] hover:text-[#00d0ff] disabled:opacity-50"
           >
-            {isAnalyzing ? '⚡ ANALYZING PATTERN...' : '🤖 RUN AI TRIAGE'}
+            {isAnalyzing ? '⚡ PROCESSING...' : '⬡ RUN RULE-BASED TRIAGE'}
           </button>
         )}
       </div>

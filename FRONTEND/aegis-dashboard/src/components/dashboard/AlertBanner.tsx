@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import type { Soldier } from '../../data/soldiers';
-import { SmsToast } from './SmsToast';
 
 interface Props {
   woundedSoldiers: Soldier[];
   allSoldiers: Soldier[];
   onShowMap: (s: Soldier) => void;
-  onSendSms: (s: Soldier) => void;
+  onSendSms: () => void;
 }
 
 // Find geographically nearest soldier to a wounded one
@@ -57,13 +55,8 @@ export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap, onSendSms
               </span>
             )}
 
-            {/* Trigger SMS */}
-            <button
-              onClick={() => onSendSms(wounded)}
-              className="bg-transparent border border-[#0b84ff] text-[#0b84ff] font-rajdhani font-bold text-[0.65rem] tracking-widest px-3 py-1 rounded cursor-pointer ml-auto hover:bg-[rgba(11,132,255,0.1)] transition-all"
-            >
-              SEND SMS
-            </button>
+            {/* AUTO-SMS is now handled by App.tsx on stationary detection */}
+            <span className="ml-auto text-[0.6rem] text-[var(--accent-green)] font-mono">⚡ AUTO-SMS ACTIVE</span>
 
             {/* View on map */}
             <button

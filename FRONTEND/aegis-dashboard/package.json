@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server:dev": "npx tsx watch server/index.ts",
+    "server:start": "npx tsx server/index.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -12,11 +14,15 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@tailwindcss/vite": "^4.2.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "leaflet": "^1.9.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "twilio": "^5.13.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
