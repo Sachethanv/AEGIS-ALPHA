@@ -1,6 +1,12 @@
 import google.genai as genai
 from google.genai import types
-client = genai.Client(api_key='AIzaSyCtbBOwCNl9bC3Zn39xte2dGr2vcc00zSM')
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 print('Sending...')
 prompt = 'Return ONLY JSON: {"test": 1}'
 response = client.models.generate_content(

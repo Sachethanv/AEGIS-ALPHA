@@ -6,6 +6,7 @@ import { SoldierGrid } from './components/dashboard/SoldierGrid';
 import { SmsToast } from './components/dashboard/SmsToast';
 import { MapModal } from './components/map/MapModal';
 import { TacticalNet } from './components/dashboard/TacticalNet';
+import { ARVision } from './components/dashboard/ARVision';
 import { useSoldierSimulation } from './hooks/useSoldierSimulation';
 import { getNearestSoldiers } from './utils/geoUtils';
 import { evaluateTriage } from './utils/triageRules';
@@ -32,7 +33,7 @@ const STATIONARY_THRESHOLD = 4; // ~2.8s — fast enough to see in demo
 export default function App() {
   const { soldiers, movementRef } = useSoldierSimulation();
   const [mapSoldier, setMapSoldier] = useState<Soldier | null>(null);
-  const [activeView, setActiveView] = useState<'dashboard' | 'tactical_net'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'tactical_net' | 'ar_vision'>('dashboard');
   const [tacticalMessages, setTacticalMessages] = useState<TacticalMessage[]>([]);
   const [activeToast, setActiveToast] = useState<TacticalMessage | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -99,7 +100,7 @@ export default function App() {
           
           setTacticalMessages(prev => [...prev, msg]);
           setActiveToast(msg);
-          setUnreadCount(prev => activeView === 'tactical_net' ? prev : prev + 1);
+          setUnreadCount(prev => (activeView === 'tactical_net' || activeView === 'ar_vision') ? prev : prev + 1);
         }).finally(() => {
           processingIds.current.delete(soldier.id);
         });
@@ -112,11 +113,11 @@ export default function App() {
 
       prevStatusRef.current[soldier.id] = soldier.status;
     });
-  }, [soldiers]);
+  }, [soldiers, activeView]);
 
-  const handleViewChange = (v: 'dashboard' | 'tactical_net') => {
+  const handleViewChange = (v: 'dashboard' | 'tactical_net' | 'ar_vision') => {
     setActiveView(v);
-    if (v === 'tactical_net') setUnreadCount(0);
+    if (v === 'tactical_net' || v === 'ar_vision') setUnreadCount(0);
   };
 
   return (
@@ -143,8 +144,10 @@ export default function App() {
               <StatusSummary soldiers={soldiers} />
               <SoldierGrid soldiers={soldiers} onShowMap={setMapSoldier} />
             </div>
-          ) : (
+          ) : activeView === 'tactical_net' ? (
             <TacticalNet messages={tacticalMessages} />
+          ) : (
+            <ARVision />
           )}
         </main>
       </div>

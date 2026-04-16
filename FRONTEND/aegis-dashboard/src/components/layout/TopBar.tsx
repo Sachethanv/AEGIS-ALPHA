@@ -1,6 +1,6 @@
 export function TopBar({ activeView, onViewChange, unreadCount }: {
-  activeView: 'dashboard' | 'tactical_net';
-  onViewChange: (v: 'dashboard' | 'tactical_net') => void;
+  activeView: 'dashboard' | 'tactical_net' | 'ar_vision';
+  onViewChange: (v: 'dashboard' | 'tactical_net' | 'ar_vision') => void;
   unreadCount: number;
 }) {
   return (
@@ -15,7 +15,7 @@ export function TopBar({ activeView, onViewChange, unreadCount }: {
 
       {/* Nav tabs */}
       <div className="flex items-center gap-1 bg-[rgba(0,0,0,0.3)] border border-[var(--bg-border)] rounded-lg p-1">
-        {(['dashboard', 'tactical_net'] as const).map(view => (
+        {(['dashboard', 'tactical_net', 'ar_vision'] as const).map(view => (
           <button
             key={view}
             onClick={() => onViewChange(view)}
@@ -26,7 +26,7 @@ export function TopBar({ activeView, onViewChange, unreadCount }: {
               border: activeView === view ? '1px solid var(--accent-green)' : '1px solid transparent',
             }}
           >
-            {view === 'dashboard' ? '⬡ DASHBOARD' : '📡 TACTICAL NET'}
+            {view === 'dashboard' ? '⬡ DASHBOARD' : view === 'tactical_net' ? '📡 TACTICAL NET' : '🥽 AR VISION'}
             {view === 'tactical_net' && unreadCount > 0 && (
               <span
                 className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold"

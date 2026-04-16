@@ -2,45 +2,109 @@ import cv2
 import numpy as np
 import google.genai as genai
 from google.genai import types
-from flask import Flask, Response
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+from flask import Flask, Response, request, jsonify
+from flask_cors import CORS
 import threading
 import json
-import re
+import time
+import speech_recognition as sr
+from queue import Queue
 
-# Use Gemini 1.5 Flash for the fastest battlefield inference
-client = genai.Client(api_key="AIzaSyB3OC0c0LMvfMZmAhnk83b9bClYRXT1P1o")
+# Use the precise model requested
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = Flask(__name__)
-camera_url = "http://192.168.1.6:8080/video"
+CORS(app) # Enable CORS for dashboard-to-HUD communication
 
-import time
+# Replace with your ESP32-CAM or IP Webcam URL
+camera_url = "http://10.1.22.64:8080/video"
 
-# Global variables to store the latest AI data
-current_data = {"box": [0, 0, 0, 0], "injury": "Scanning...", "guidance": "Waiting for analysis", "tourniquet": False}
+# Global state
+current_data = {"box": [0, 0, 0, 0], "injury": "Scanning...", "guidance": "Standby", "tourniquet": False}
+medic_speech_queue = Queue()
+ai_handbook_list = ["WAITING FOR AI..."]
+medic_speech_list = ["LISTENING..."]
 lock = threading.Lock()
-last_api_call = 0  # timestamp for API throttling
+last_api_call = 0
+
+class ScrollingHUD:
+    def __init__(self, title, max_lines=3, scroll_period=2.0):
+        self.lines = [f"--- {title} ---", "SYSTEM READY", "WAITING FOR DATA..."]
+        self.max_lines = max_lines
+        self.scroll_period = scroll_period
+        self.start_time = time.time()
+
+    def add_text(self, text, width_limit, font_scale, thickness):
+        # Basic word wrap for HUD
+        words = text.split()
+        wrapped = []
+        current_line = ""
+        for word in words:
+            test_line = current_line + " " + word if current_line else word
+            (w, _) = cv2.getTextSize(test_line, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+            if w < width_limit:
+                current_line = test_line
+            else:
+                wrapped.append(current_line)
+                current_line = word
+        if current_line:
+            wrapped.append(current_line)
+        
+        for line in wrapped:
+            self.lines.append(line)
+            if len(self.lines) > self.max_lines:
+                self.lines.pop(0)
+        self.start_time = time.time() # Reset scroll timer on new text
+
+    def get_render_offset(self):
+        # Calculate vertical drift for "moving up" effect
+        elapsed = time.time() - self.start_time
+        if elapsed > self.scroll_period: return 0
+        # Slowly move up (0 to 1) then snap
+        return int((1.0 - (elapsed / self.scroll_period)) * 10)
+
+ai_hud = ScrollingHUD("HANDBOOK")
+medic_hud = ScrollingHUD("COMMS")
+
+def run_stt():
+    recognizer = sr.Recognizer()
+    mic = sr.Microphone()
+    print("STT Thread Started...")
+    while True:
+        try:
+            with mic as source:
+                recognizer.adjust_for_ambient_noise(source)
+                audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+            text = recognizer.recognize_google(audio)
+            with lock:
+                medic_hud.add_text(text.upper(), 400, 0.6, 1)
+        except Exception as e:
+            pass # Silent fail for ambient gaps
 
 def call_gemini(frame):
     global current_data
     try:
-        _, buffer = cv2.imencode('.jpg', frame)
+        small_frame = cv2.resize(frame, (640, 480))
+        _, buffer = cv2.imencode('.jpg', small_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
         img_data = buffer.tobytes()
         
-        # System instruction to force structured JSON output
         prompt = (
-            "Analyze the image and identify the most critical medical wound. "
-            "If a wound is found, provide its bounding box as [ymin, xmin, ymax, xmax] normalized from 0 to 1000. "
-            "Provide the injury type and a short guidance action. "
-            "Also check if a tourniquet has been applied to stop bleeding. Set 'tourniquet_applied' to true if you see one. "
-            "If no wound is found, return box_2d as [0,0,0,0], injury as 'CLEAR', guidance as 'Proceed', and tourniquet_applied as false."
+            "Acting as a Medical Combat expert in TCCC (Tactical Combat Casualty Care), "
+            "identify the injury and provide immediate life-saving guidance using the MARCH protocol. "
+            "Return JSON: {'box_2d': [ymin, xmin, ymax, xmax], 'injury': str, 'guidance': str, 'tourniquet_applied': bool}. "
+            "Maintain tactical focus. Guidance must be under 45 words."
         )
         
         response = client.models.generate_content(
-            model='gemini-3.1-flash-lite-preview',#don't change to 1.5 flash verion (always use gemini-3.1-flash-lite-preview)
+            model='gemini-3.1-flash-lite-preview',
             contents=[types.Part.from_bytes(data=img_data, mime_type='image/jpeg'), prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                # Defining a schema helps Gemini reliably output the right JSON
                 response_schema={
                     "type": "OBJECT",
                     "properties": {
@@ -54,118 +118,122 @@ def call_gemini(frame):
             )
         )
         
-        # Parse the JSON output safely
-        text = response.text.strip()
-        if text.startswith("```json"): text = text[7:]
-        elif text.startswith("```"): text = text[3:]
-        if text.endswith("```"): text = text[:-3]
-        data = json.loads(text.strip())
+        data = json.loads(response.text.strip())
         with lock:
             current_data["box"] = data.get("box_2d", [0, 0, 0, 0])
             current_data["injury"] = data.get("injury", "Unknown")
             current_data["guidance"] = data.get("guidance", "N/A")
             current_data["tourniquet"] = data.get("tourniquet_applied", False)
-            print(f"Gemini Update: {current_data}")
+            ai_hud.add_text(current_data["guidance"].upper(), 400, 0.6, 1)
     except Exception as e:
-        print(f"Gemini Error: {e}")
+        print(f"Inference Error: {e}")
+
+def draw_hud_column(img, x_pos, y_start, title, lines, color, offset):
+    # Draw Title
+    cv2.putText(img, title, (x_pos, y_start - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+    # Draw Underline
+    cv2.line(img, (x_pos, y_start - 20), (x_pos + 150, y_start - 20), color, 1)
+    
+    # Draw Lines with scrolling offset
+    for i, line in enumerate(lines):
+        y = y_start + (i * 40) - offset
+        # Fade out top line based on offset
+        alpha = 1.0 if i > 0 else (offset / 10.0)
+        cv2.putText(img, line, (x_pos, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
+
+def draw_transparent_overlay(img, info_color):
+    """Creates a high-tech translucent HUD base"""
+    overlay = img.copy()
+    # Semi-transparent dark boxes for the two columns
+    cv2.rectangle(overlay, (40, 40), (450, 240), (10, 10, 10), -1) # Left
+    cv2.rectangle(overlay, (img.shape[1]-450, 40), (img.shape[1]-40, 240), (10, 10, 10), -1) # Right
+    alpha = 0.5
+    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def gen_frames():
     cap = cv2.VideoCapture(camera_url)
     global last_api_call
 
+    # Target Resolution
+    TARGET_W, TARGET_H = 1920, 1080 
+    
+    # Start STT thread once
+    threading.Thread(target=run_stt, daemon=True).start()
+
     while True:
         success, frame = cap.read()
         if not success: break
 
-        current_time = time.time()
-        # Throttling to once every 4 seconds to strictly obey the 
-        # 5 RPM Free Tier limit of Gemini API
-        if current_time - last_api_call > 5:
-            last_api_call = current_time
+        curr_time = time.time()
+        if curr_time - last_api_call > 10: # Reduced frequency for stability
+            last_api_call = curr_time
             threading.Thread(target=call_gemini, args=(frame.copy(),), daemon=True).start()
 
-        # 1. Standardize Frame for Single View
-        view = cv2.resize(frame, (2532, 1170))
+        view = cv2.resize(frame, (TARGET_W, TARGET_H))
 
-        # Blackout Triage: Convert to Grayscale & Apply Jet Colormap
-        gray = cv2.cvtColor(view, cv2.COLOR_BGR2GRAY)
-        # Apply slight contrast enhancement to amplify heat signatures
-        gray = cv2.equalizeHist(gray)
-        view = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
-
-        # 2. Draw Dynamic HUD
         with lock:
-            ymin, xmin, ymax, xmax = current_data["box"]
+            box = current_data["box"]
             injury = current_data["injury"]
-            guidance = current_data["guidance"]
-            tourniquet_applied = current_data.get("tourniquet", False)
+            tourniquet = current_data["tourniquet"]
+            ai_lines = list(ai_hud.lines)
+            medic_lines = list(medic_hud.lines)
+            ai_offset = ai_hud.get_render_offset()
+            medic_offset = medic_hud.get_render_offset()
 
-        # Logical Colors
-        if tourniquet_applied:
-            info_color = (0, 255, 0) # Green for Hemorrhage Controlled
-            injury_text = "HEMORRHAGE CONTROLLED"
-            action_text = "Hemorrhage Controlled"
-        else:
-            info_color = (0, 0, 255) # Red for default wound
-            injury_text = injury.upper()
-            action_text = guidance
+        info_color = (0, 255, 0) if tourniquet else (0, 0, 255)
+        
+        # 1. Draw Transparent HUD Bases
+        draw_transparent_overlay(view, info_color)
 
-        # Convert normalized [0-1000] to pixels [2532x1170]
-        c_xmin, c_ymin = int(xmin * 2532 / 1000), int(ymin * 1170 / 1000)
-        c_xmax, c_ymax = int(xmax * 2532 / 1000), int(ymax * 1170 / 1000)
+        # 2. Draw Left Column: AI HANDBOOK
+        draw_hud_column(view, 60, 100, "📖 AI HANDBOOK", ai_lines, (0, 232, 122), ai_offset)
 
-        if any(current_data["box"]): # Only draw if a box exists
-            # AR Guidance: Pulsing center circle
-            center_x = (c_xmin + c_xmax) // 2
-            center_y = (c_ymin + c_ymax) // 2
-            
-            # Pulsing effect based on time
-            pulse_radius = int(40 + 20 * np.sin(time.time() * 5))
-            cv2.circle(view, (center_x, center_y), pulse_radius, info_color, 4)
-            cv2.circle(view, (center_x, center_y), 5, info_color, -1)
+        # 3. Draw Right Column: MEDIC COMMS
+        draw_hud_column(view, TARGET_W - 430, 100, "🎙️ MEDIC COMMS", medic_lines, (255, 200, 0), medic_offset)
 
-            # Draw directional arrow if wound is at screen extremes
-            if xmin < 100:
-                # Point Left
-                cv2.arrowedLine(view, (400, 585), (100, 585), (0, 255, 255), 10, tipLength=0.3)
-                cv2.putText(view, "TURN LEFT", (150, 540), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 4)
-            elif xmax > 900:
-                # Point Right
-                cv2.arrowedLine(view, (2132, 585), (2432, 585), (0, 255, 255), 10, tipLength=0.3)
-                cv2.putText(view, "TURN RIGHT", (2100, 540), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 4)
+        # 4. Draw Tracking Reticle
+        if any(box):
+            ymin, xmin, ymax, xmax = box
+            cx1, cy1 = int(xmin * TARGET_W / 1000), int(ymin * TARGET_H / 1000)
+            cx2, cy2 = int(xmax * TARGET_W / 1000), int(ymax * TARGET_H / 1000)
+            center = ((cx1 + cx2) // 2, (cy1 + cy2) // 2)
+            pulse = int(30 + 15 * np.sin(time.time() * 6))
+            cv2.circle(view, center, pulse, info_color, 3)
+            cv2.drawMarker(view, center, info_color, cv2.MARKER_CROSS, 40, 2)
+            cv2.putText(view, injury.upper(), (cx1, cy1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, info_color, 2)
 
-            # Label background for readability
-            cv2.rectangle(view, (50, 50), (1216, 220), (0, 0, 0), -1)
-            cv2.putText(view, f"STATUS: {injury_text}", (70, 110), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.5, info_color, 3)
-            cv2.putText(view, f"ACTION: {action_text}", (70, 180), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
-
-        # 3. Final View
-        ret, buffer = cv2.imencode('.jpg', view)
+        # Encode
+        ret, buffer = cv2.imencode('.jpg', view, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
         yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
 @app.route('/')
 def index():
-    html = """
+    return """
     <html>
-      <head>
-        <title>AEGIS VR HUD</title>
-        <style>
-          body, html { margin: 0; padding: 0; height: 100%; background-color: black; overflow: hidden; }
-          img { display: block; width: 100%; height: 100%; object-fit: contain; }
-        </style>
-      </head>
-      <body>
-        <img src="/video_feed" />
+      <body style="margin:0; background:black; display:flex; justify-content:center; align-items:center;">
+        <img src="/video_feed" style="width:100vw; height:100vh; object-fit:cover;" />
       </body>
     </html>
     """
-    return html
 
 @app.route('/video_feed')
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/speech', methods=['POST'])
+def handle_speech():
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        if text:
+            print(f"[DASHBOARD STT] Received: {text}")
+            with lock:
+                medic_hud.add_text(text.upper(), 400, 0.6, 1)
+            return jsonify({"status": "success", "received": text}), 200
+        return jsonify({"status": "error", "message": "No text provided"}), 400
+    except Exception as e:
+        print(f"[DASHBOARD STT] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, threaded=True)
