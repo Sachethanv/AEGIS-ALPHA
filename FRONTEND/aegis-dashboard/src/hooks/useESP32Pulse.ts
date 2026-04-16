@@ -12,16 +12,33 @@ export function useESP32Pulse(enabled: boolean = true) {
     const pollDevice = async () => {
       if (!isPolling) return;
 
-      try {
-        // ALWAYS use the Vite proxy so we fetch the raw text number off the ESP32 /data route
-        const response = await fetch('/esp32-data', {
-          method: 'GET',
-          headers: { 'Cache-Control': 'no-cache' }
-        });
+      // HANDOVER LOGIC: Support both Infrastructure (Cloud) and MANNET (Tactical) IPs
+      const endpoints = ['/esp32-data', 'http://192.168.4.1/data'];
+      
+      let responseData = null;
+      let success = false;
 
-        if (response.ok) {
-          const textData = await response.text();
-          const irValue = parseInt(textData.trim(), 10);
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, {
+            method: 'GET',
+            headers: { 'Cache-Control': 'no-cache' },
+            // Add a short timeout to fail fast and switch to the next IP
+            signal: AbortSignal.timeout(1000) 
+          });
+
+          if (res.ok) {
+            responseData = await res.text();
+            success = true;
+            break; // Found an active link!
+          }
+        } catch (e) {
+          // Continue to next endpoint
+        }
+      }
+
+      if (success && responseData) {
+          const irValue = parseInt(responseData.trim(), 10);
 
           if (!isNaN(irValue) && irValue >= 2500) {  // Basic sanity check for finger presence
 
@@ -77,9 +94,6 @@ export function useESP32Pulse(enabled: boolean = true) {
              // Finger removed or totally bad read (< 2500 IR count)
              setVitals({ bpm: 0, spo2: 0 });
           }
-        }
-      } catch (error) {
-        // Silently catch fetch errors to avoid spamming the console
       }
 
       // Snappy polling updates to guarantee every single change fires

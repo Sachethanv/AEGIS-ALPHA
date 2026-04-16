@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { TacticalMessage } from '../../App';
-import type { Soldier } from '../../data/soldiers';
 
 interface SmsToastProps {
   message: TacticalMessage;

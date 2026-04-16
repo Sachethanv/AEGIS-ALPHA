@@ -14,6 +14,7 @@ import json
 import time
 import speech_recognition as sr
 from queue import Queue
+import socket
 
 # Use the precise model requested
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -21,8 +22,29 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 app = Flask(__name__)
 CORS(app) # Enable CORS for dashboard-to-HUD communication
 
-# Replace with your ESP32-CAM or IP Webcam URL
-camera_url = "http://10.1.22.64:8080/video"
+# Potential Camera Feed URLs (Infrastructure vs MANNET)
+CAMERA_URLS = [
+    "http://10.1.22.64:8080/video",    # Lecture Hall (Cloud Link)
+    "http://192.168.4.3:8080/video",   # AEGIS Tactical (MANNET Hub)
+]
+
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
+# Automatically prioritize MANNET if we are on the tactical subnet
+local_ip = get_local_ip()
+if local_ip.startswith("192.168.4."):
+    print(f"[*] Subnet Sensing: Tactical Network Detected ({local_ip}). Prioritizing MANNET Feed.")
+    CAMERA_URLS = [CAMERA_URLS[1], CAMERA_URLS[0]]
+else:
+    print(f"[*] Subnet Sensing: Infrastructure Network Detected ({local_ip}).")
 
 # Global state
 current_data = {"box": [0, 0, 0, 0], "injury": "Scanning...", "guidance": "Standby", "tourniquet": False}
@@ -72,9 +94,14 @@ ai_hud = ScrollingHUD("HANDBOOK")
 medic_hud = ScrollingHUD("COMMS")
 
 def run_stt():
-    recognizer = sr.Recognizer()
-    mic = sr.Microphone()
-    print("STT Thread Started...")
+    try:
+        recognizer = sr.Recognizer()
+        mic = sr.Microphone()
+        print("[*] STT Engine Initialized. Listening for Medic Comms...")
+    except Exception as e:
+        print(f"[!] STT Error: Could not access microphone. {e}")
+        return
+
     while True:
         try:
             with mic as source:
@@ -151,18 +178,31 @@ def draw_transparent_overlay(img, info_color):
     cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
 def gen_frames():
-    cap = cv2.VideoCapture(camera_url)
     global last_api_call
-
+    
     # Target Resolution
     TARGET_W, TARGET_H = 1920, 1080 
     
-    # Start STT thread once
-    threading.Thread(target=run_stt, daemon=True).start()
+    current_url_index = 0
+    cap = cv2.VideoCapture(CAMERA_URLS[current_url_index])
+    print(f"[*] Initializing camera stream: {CAMERA_URLS[current_url_index]}")
 
     while True:
         success, frame = cap.read()
-        if not success: break
+        
+        if not success:
+            # HANDOVER LOGIC: Cycle through URLs if connection is lost
+            print(f"[!] Stream lost. Attempting handover...")
+            cap.release()
+            
+            # Try next URL
+            current_url_index = (current_url_index + 1) % len(CAMERA_URLS)
+            next_url = CAMERA_URLS[current_url_index]
+            print(f"[*] Trying handover target: {next_url}")
+            
+            cap = cv2.VideoCapture(next_url)
+            time.sleep(1) # Give network time to settle
+            continue
 
         curr_time = time.time()
         if curr_time - last_api_call > 10: # Reduced frequency for stability
@@ -236,4 +276,6 @@ def handle_speech():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
+    # Start STT thread once at server startup
+    threading.Thread(target=run_stt, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, threaded=True)

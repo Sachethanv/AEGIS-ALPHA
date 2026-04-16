@@ -7,6 +7,7 @@ import { SmsToast } from './components/dashboard/SmsToast';
 import { MapModal } from './components/map/MapModal';
 import { TacticalNet } from './components/dashboard/TacticalNet';
 import { ARVision } from './components/dashboard/ARVision';
+import { MannetView } from './components/dashboard/MannetView';
 import { useSoldierSimulation } from './hooks/useSoldierSimulation';
 import { getNearestSoldiers } from './utils/geoUtils';
 import { evaluateTriage } from './utils/triageRules';
@@ -33,7 +34,7 @@ const STATIONARY_THRESHOLD = 4; // ~2.8s — fast enough to see in demo
 export default function App() {
   const { soldiers, movementRef } = useSoldierSimulation();
   const [mapSoldier, setMapSoldier] = useState<Soldier | null>(null);
-  const [activeView, setActiveView] = useState<'dashboard' | 'tactical_net' | 'ar_vision'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'tactical_net' | 'ar_vision' | 'mannet'>('dashboard');
   const [tacticalMessages, setTacticalMessages] = useState<TacticalMessage[]>([]);
   const [activeToast, setActiveToast] = useState<TacticalMessage | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -115,9 +116,9 @@ export default function App() {
     });
   }, [soldiers, activeView]);
 
-  const handleViewChange = (v: 'dashboard' | 'tactical_net' | 'ar_vision') => {
+  const handleViewChange = (v: 'dashboard' | 'tactical_net' | 'ar_vision' | 'mannet') => {
     setActiveView(v);
-    if (v === 'tactical_net' || v === 'ar_vision') setUnreadCount(0);
+    if (v === 'tactical_net' || v === 'ar_vision' || v === 'mannet') setUnreadCount(0);
   };
 
   return (
@@ -139,15 +140,16 @@ export default function App() {
                 woundedSoldiers={woundedSoldiers}
                 allSoldiers={soldiers}
                 onShowMap={setMapSoldier}
-                onSendSms={() => {}}
               />
               <StatusSummary soldiers={soldiers} />
               <SoldierGrid soldiers={soldiers} onShowMap={setMapSoldier} />
             </div>
           ) : activeView === 'tactical_net' ? (
             <TacticalNet messages={tacticalMessages} />
-          ) : (
+          ) : activeView === 'ar_vision' ? (
             <ARVision />
+          ) : (
+            <MannetView soldiers={soldiers} />
           )}
         </main>
       </div>

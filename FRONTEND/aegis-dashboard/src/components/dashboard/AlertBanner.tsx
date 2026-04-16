@@ -4,7 +4,6 @@ interface Props {
   woundedSoldiers: Soldier[];
   allSoldiers: Soldier[];
   onShowMap: (s: Soldier) => void;
-  onSendSms: () => void;
 }
 
 // Find geographically nearest soldier to a wounded one
@@ -21,7 +20,7 @@ function findNearest(wounded: Soldier, others: Soldier[]): Soldier | null {
   });
 }
 
-export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap, onSendSms }: Props) {
+export function AlertBanner({ woundedSoldiers, allSoldiers, onShowMap }: Props) {
   if (!woundedSoldiers.length) return null;
 
   return (

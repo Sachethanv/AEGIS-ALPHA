@@ -8,7 +8,8 @@ export default defineConfig({
     proxy: {
       // ESP32 hardware feed
       '/esp32-data': {
-        target: 'http://10.1.19.103',
+        target: 'http://10.1.19.103', // Lecture Hall (Infrastructure)
+        // target: 'http://192.168.4.1', // AEGIS Tactical (MANNET Gateway)
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/esp32-data/, '/data')
       },
